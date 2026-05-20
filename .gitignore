@@ -1,3 +1,5 @@
+.env
+.env.*
 data/database.json
 .codex-bin/
 share-static/
