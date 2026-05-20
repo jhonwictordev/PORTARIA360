@@ -67,19 +67,4 @@ Depois abra:
 .\run.ps1 test
 ```
 
-## Segurança e LGPD
 
-- Senhas com `PBKDF2-SHA256`
-- Dados sensiveis cifrados com `AES-256-GCM`
-- Sessao assinada com HMAC
-- 2FA TOTP opcional por usuario
-- Auditoria de eventos operacionais
-- Modelo de dados preparado para minimizacao, rastreabilidade e retencao configuravel
-
-## Evolucao recomendada para producao
-
-- Substituir JSON por PostgreSQL e Redis
-- Extrair webhooks/notificacoes para fila assicrona
-- Integrar billing real com Stripe, Pagar.me ou Asaas
-- Integrar gateways IoT, leitores RFID, biometria e CFTV reais
-- Adicionar observabilidade, rate limit, SSO, backups e criptografia por tenant
