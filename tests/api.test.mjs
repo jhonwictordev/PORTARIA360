@@ -1,0 +1,142 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import http from "node:http";
+import { once } from "node:events";
+import { createApp } from "../src/app.mjs";
+
+let server;
+let baseUrl;
+
+test.before(async () => {
+  server = http.createServer(createApp({ persist: false }));
+  server.listen(0);
+  await once(server, "listening");
+  const { port } = server.address();
+  baseUrl = `http://127.0.0.1:${port}`;
+});
+
+test.after(async () => {
+  await new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+});
+
+async function login({ email, password, tenantId }) {
+  const response = await fetch(`${baseUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, tenantId })
+  });
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  const cookie = response.headers.get("set-cookie")?.split(";")[0];
+  assert.ok(cookie);
+  return { payload, cookie };
+}
+
+async function authedFetch(path, cookie, tenantId, options = {}) {
+  return fetch(`${baseUrl}${path}`, {
+    ...options,
+    headers: {
+      Cookie: cookie,
+      "x-tenant-id": tenantId,
+      ...(options.headers ?? {})
+    }
+  });
+}
+
+test("autentica administrador e retorna dashboard multi-condominio", async () => {
+  const { payload, cookie } = await login({
+    email: "admin@portaria360.local",
+    password: "Admin@123",
+    tenantId: "tenant_solaris"
+  });
+
+  assert.equal(payload.session.activeTenant.id, "tenant_solaris");
+  assert.equal(payload.session.user.role, "administrator");
+  assert.equal(payload.session.tenants.length, 2);
+
+  const dashboardResponse = await authedFetch("/api/dashboard/overview", cookie, "tenant_solaris");
+  assert.equal(dashboardResponse.status, 200);
+  const dashboard = await dashboardResponse.json();
+  assert.ok(dashboard.cards.accessesToday >= 1);
+  assert.ok(Array.isArray(dashboard.recentAccesses));
+});
+
+test("cria contato, agenda visita e autoriza acesso por codigo temporario", async () => {
+  const { cookie } = await login({
+    email: "mariana@solaris.local",
+    password: "Morador@123",
+    tenantId: "tenant_solaris"
+  });
+
+  const contactResponse = await authedFetch("/api/contacts", cookie, "tenant_solaris", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Bruno Teste",
+      type: "visitor",
+      phone: "11988887777",
+      document: "12312312399"
+    })
+  });
+  assert.equal(contactResponse.status, 201);
+  const contact = await contactResponse.json();
+
+  const visitResponse = await authedFetch("/api/visits", cookie, "tenant_solaris", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      unitId: "unit_sol_101",
+      contactId: contact.id,
+      type: "visitor",
+      scheduledStartAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      scheduledEndAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      status: "approved"
+    })
+  });
+  assert.equal(visitResponse.status, 201);
+  const visit = await visitResponse.json();
+  assert.ok(visit.temporaryCode);
+
+  const { cookie: doormanCookie } = await login({
+    email: "porteiro@solaris.local",
+    password: "Porteiro@123",
+    tenantId: "tenant_solaris"
+  });
+
+  const accessResponse = await authedFetch("/api/access-events", doormanCookie, "tenant_solaris", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      gateId: "gate_sol_main",
+      direction: "entry",
+      method: "TEMP_CODE",
+      temporaryCode: visit.temporaryCode
+    })
+  });
+  assert.equal(accessResponse.status, 201);
+  const access = await accessResponse.json();
+  assert.equal(access.status, "allowed");
+  assert.equal(access.userType, "visitor");
+});
+
+test("liberacao remota e exportacao CSV funcionam", async () => {
+  const { cookie } = await login({
+    email: "admin@portaria360.local",
+    password: "Admin@123",
+    tenantId: "tenant_solaris"
+  });
+
+  const gateResponse = await authedFetch("/api/gates/gate_sol_main/open", cookie, "tenant_solaris", {
+    method: "POST"
+  });
+  assert.equal(gateResponse.status, 200);
+  const gatePayload = await gateResponse.json();
+  assert.match(gatePayload.message, /Comando enviado/);
+
+  const exportResponse = await authedFetch("/api/exports/access-events.csv", cookie, "tenant_solaris");
+  assert.equal(exportResponse.status, 200);
+  const csv = await exportResponse.text();
+  assert.match(csv, /Data,Pessoa,Tipo,Direcao,Metodo,Status/);
+});

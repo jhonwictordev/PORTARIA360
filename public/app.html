@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App Portaria360 | App do Morador</title>
+    <link rel="icon" href="/assets/portaria360logo.png" type="image/png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="theme-mobile">
+    <div class="ambient ambient-three"></div>
+
+    <main class="mobile-shell">
+      <section id="residentLoginPanel" class="panel glass login-panel mobile-login">
+        <img src="/assets/portaria360logo.png" alt="App Portaria360" class="resident-brand-logo" />
+        <div class="eyebrow">App do morador</div>
+        <h1>Acesse sua unidade no App Portaria360, libere visitas e opere mesmo offline.</h1>
+        <form id="residentLoginForm" class="stack-form">
+          <label>
+            <span>E-mail</span>
+            <input name="email" type="email" value="mariana@solaris.local" required />
+          </label>
+          <label>
+            <span>Senha</span>
+            <input name="password" type="password" value="Morador@123" required />
+          </label>
+          <input type="hidden" name="tenantId" value="tenant_solaris" />
+          <button type="submit" class="primary">Entrar</button>
+        </form>
+      </section>
+
+      <section id="residentWorkspace" class="workspace hidden">
+        <header class="hero panel mobile-hero">
+          <div>
+            <div class="eyebrow">Aplicativo do morador</div>
+            <h2 id="residentTitle">Minha unidade</h2>
+            <p id="residentSubtitle" class="lede compact"></p>
+          </div>
+          <div class="hero-actions mobile-actions">
+            <span id="offlineBadge" class="status-pill">Online</span>
+            <button id="residentLogout" class="ghost">Sair</button>
+          </div>
+        </header>
+
+        <section class="mobile-grid">
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Ações rápidas</h3>
+            </div>
+            <div class="quick-actions">
+              <button id="openGateButton" class="primary">Abrir portão</button>
+              <button id="syncQueueButton" class="secondary">Sincronizar fila offline</button>
+            </div>
+            <div id="queueInfo" class="muted-box"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Autorização recorrente</h3>
+            </div>
+            <form id="allowlistForm" class="stack-form compact-form">
+              <label>
+                <span>Contato existente</span>
+                <select id="allowContactId" name="contactId"></select>
+              </label>
+              <label>
+                <span>Válido até</span>
+                <input name="validTo" type="datetime-local" required />
+              </label>
+              <label>
+                <span>Observação</span>
+                <input name="notes" placeholder="Ex.: diarista toda semana" />
+              </label>
+              <button type="submit" class="secondary">Salvar autorização</button>
+            </form>
+          </article>
+
+          <article class="panel wide">
+            <div class="panel-head">
+              <h3>Nova visita</h3>
+            </div>
+            <form id="residentVisitForm" class="form-grid">
+              <label>
+                <span>Nome</span>
+                <input name="name" required />
+              </label>
+              <label>
+                <span>Tipo</span>
+                <select name="type">
+                  <option value="visitor">Visitante</option>
+                  <option value="service">Prestador</option>
+                </select>
+              </label>
+              <label>
+                <span>Telefone</span>
+                <input name="phone" />
+              </label>
+              <label>
+                <span>Documento</span>
+                <input name="document" />
+              </label>
+              <label>
+                <span>Início</span>
+                <input name="scheduledStartAt" type="datetime-local" required />
+              </label>
+              <label>
+                <span>Fim</span>
+                <input name="scheduledEndAt" type="datetime-local" required />
+              </label>
+              <label class="full">
+                <span>Observações</span>
+                <input name="notes" />
+              </label>
+              <button type="submit" class="primary full">Autorizar visita</button>
+            </form>
+          </article>
+
+          <article class="panel wide">
+            <div class="panel-head">
+              <h3>Histórico e códigos</h3>
+            </div>
+            <div id="residentVisitsList" class="feed-list"></div>
+          </article>
+
+          <article class="panel wide">
+            <div class="panel-head">
+              <h3>Notificações</h3>
+            </div>
+            <div id="residentNotifications" class="notification-list"></div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/shared.js"></script>
+    <script type="module" src="/resident.js"></script>
+  </body>
+</html>
