@@ -1,70 +1,52 @@
-# App Portaria360
+App Portaria360
 
-MVP SaaS completo para controle de acesso em condominios residenciais e comerciais, com arquitetura API-first, operacao em tempo real, multi-condominio, trilha de auditoria, billing SaaS e app mobile/PWA para moradores.
+Complete SaaS MVP for access control in residential and commercial condominiums, with API-first architecture, real-time operation, multi-condominium support, audit trail, SaaS billing, and a mobile/PWA app for residents.
 
-## O que esta pronto
+What’s Ready
+User management with profiles administrator, syndic, doorman, and resident
+Visitor and service provider registration via contact management
+Association of residents with units
+Scheduling, recurring authorization, and visit history per unit
+Real-time entry and exit logging
+Remote gate release via web or resident app
+Operational dashboard with alerts, devices, CCTV, and recent activity
+Webhooks, plan-based billing, CSV/PDF export, and notification logs
+Mobile PWA with offline queue and later synchronization
+Sensitive data encryption, password hashing, signed sessions, and optional TOTP 2FA
+Architecture
+Backend: Pure Node.js with REST API, SSE for real-time updates, and JSON persistence
+Web frontend: HTML/CSS/JS without build, with a responsive admin and concierge panel
+Mobile frontend: PWA in HTML/CSS/JS for residents
+Persistence: data/database.json
+Multi-tenant domain: a user can access multiple condominiums with the same account
+Structure
+src/server.mjs: HTTP bootstrap
+src/app.mjs: API, business rules, and static file delivery
+src/seed.mjs: multi-condominium demo database
+src/services/: persistence, real-time, and reporting
+src/utils/: security and HTTP utilities
+public/: web panel, mobile/PWA app, CSS, and assets
+tests/api.test.mjs: automated API tests
+docs/api.md: quick guide for endpoints
+Demo Credentials
+Administrator: admin@portaria360.local / Admin@123
+Syndic: sindico@solaris.local / Sindico@123
+Doorman: porteiro@solaris.local / Porteiro@123
+Resident: mariana@solaris.local / Morador@123
+How to Run
 
-- Gestao de usuarios com perfis `administrator`, `syndic`, `doorman` e `resident`
-- Cadastro de visitantes e prestadores via diretoria de contatos
-- Associacao de moradores a unidades
-- Agendamento, autorizacao recorrente e historico de visitas por unidade
-- Registro de entradas e saidas em tempo real
-- Liberacao remota de gates pela web ou app do morador
-- Dashboard operacional com alertas, dispositivos, CFTV e movimentacao recente
-- Webhooks, billing por plano, exportacao CSV/PDF e logs de notificacao
-- PWA mobile com fila offline e sincronizacao posterior
-- Criptografia de dados sensiveis, hash de senha, sessao assinada e 2FA TOTP opcional
+If node is in the PATH:
 
-## Arquitetura
-
-- Backend: Node.js puro com API REST, SSE para realtime e persistencia em JSON
-- Frontend web: HTML/CSS/JS sem build, com painel responsivo para administracao e portaria
-- Frontend mobile: PWA em HTML/CSS/JS para moradores
-- Persistencia: `data/database.json`
-- Dominio multi-tenant: um usuario pode acessar multiplos condominios pela mesma conta
-
-## Estrutura
-
-- `src/server.mjs`: bootstrap HTTP
-- `src/app.mjs`: API, regras de negocio e entrega de arquivos estaticos
-- `src/seed.mjs`: base de demonstracao multi-condominio
-- `src/services/`: persistencia, realtime e relatorios
-- `src/utils/`: seguranca e utilitarios HTTP
-- `public/`: painel web, app mobile/PWA, CSS e assets
-- `tests/api.test.mjs`: testes automatizados da API
-- `docs/api.md`: guia rapido dos endpoints
-
-## Credenciais demo
-
-- Administrador: `admin@portaria360.local` / `Admin@123`
-- Sindico: `sindico@solaris.local` / `Sindico@123`
-- Porteiro: `porteiro@solaris.local` / `Porteiro@123`
-- Moradora: `mariana@solaris.local` / `Morador@123`
-
-## Como executar
-
-Se `node` estiver no PATH:
-
-```powershell
 node --run start
-```
 
-Se nao estiver, use o launcher deste workspace:
+If not, use this workspace launcher:
 
-```powershell
 .\run.ps1 start
-```
 
-Depois abra:
+Then open:
 
-- Painel web: `http://localhost:3000/`
-- App do morador: `http://localhost:3000/app`
-- OpenAPI resumido: `http://localhost:3000/api/docs/openapi`
-
-## Testes
-
-```powershell
+Web panel: http://localhost:3000/
+Resident app: http://localhost:3000/app
+Summarized OpenAPI: http://localhost:3000/api/docs/openapi
+Tests
 .\run.ps1 test
-```
-
-
