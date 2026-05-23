@@ -43,10 +43,3 @@ If not, use this workspace launcher:
 
 .\run.ps1 start
 
-Then open:
-
-Web panel: http://localhost:3000/
-Resident app: http://localhost:3000/app
-Summarized OpenAPI: http://localhost:3000/api/docs/openapi
-Tests
-.\run.ps1 test
