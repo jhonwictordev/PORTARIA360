@@ -2,6 +2,8 @@
 
 ## Endpoints principais
 
+- `GET /api/docs/openapi` `autenticado`
+- `GET /docs/api` `autenticado`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/session`
@@ -46,15 +48,20 @@
 - `x-tenant-id: tenant_solaris`
 - `Cookie: session=...`
 
+## Acesso a documentacao
+
+- Os endpoints de documentacao exigem sessao autenticada.
+- Use `POST /api/auth/login` para obter o cookie `session` antes de acessar `GET /api/docs/openapi` ou `GET /docs/api`.
+
 ## Exemplos rapidos
 
 ### Login
 
 ```json
 {
-  "email": "admin@portaria360.local",
-  "password": "Admin@123",
-  "tenantId": "tenant_solaris"
+  "email": "usuario@empresa.com",
+  "password": "<senha-do-usuario>",
+  "tenantId": "tenant_exemplo"
 }
 ```
 

@@ -140,3 +140,34 @@ test("liberacao remota e exportacao CSV funcionam", async () => {
   const csv = await exportResponse.text();
   assert.match(csv, /Data,Pessoa,Tipo,Direcao,Metodo,Status/);
 });
+
+test("documentacao exige autenticacao", async () => {
+  const openApiResponse = await fetch(`${baseUrl}/api/docs/openapi`);
+  assert.equal(openApiResponse.status, 401);
+
+  const markdownResponse = await fetch(`${baseUrl}/docs/api`);
+  assert.equal(markdownResponse.status, 401);
+});
+
+test("documentacao autenticada nao expoe credenciais de teste", async () => {
+  const { cookie } = await login({
+    email: "admin@portaria360.local",
+    password: "Admin@123",
+    tenantId: "tenant_solaris"
+  });
+
+  const openApiResponse = await authedFetch("/api/docs/openapi", cookie, "tenant_solaris");
+  assert.equal(openApiResponse.status, 200);
+  const openApi = await openApiResponse.json();
+  const openApiText = JSON.stringify(openApi);
+  assert.ok(openApi.components?.securitySchemes?.sessionCookie);
+  assert.ok(openApi.security?.length);
+  assert.match(openApiText, /usuario@empresa\.com/);
+  assert.doesNotMatch(openApiText, /admin@portaria360\.local|Admin@123|Morador@123/);
+
+  const markdownResponse = await authedFetch("/docs/api", cookie, "tenant_solaris");
+  assert.equal(markdownResponse.status, 200);
+  const markdown = await markdownResponse.text();
+  assert.match(markdown, /usuario@empresa\.com/);
+  assert.doesNotMatch(markdown, /admin@portaria360\.local|Admin@123|Morador@123/);
+});

@@ -379,8 +379,51 @@ function createOpenApiDescription() {
       version: "1.0.0",
       description: "API-first para controle de acesso de condominios multi-tenant."
     },
+    components: {
+      securitySchemes: {
+        sessionCookie: {
+          type: "apiKey",
+          in: "cookie",
+          name: "session",
+          description: "Sessao autenticada emitida pelo endpoint de login."
+        },
+        tenantHeader: {
+          type: "apiKey",
+          in: "header",
+          name: "x-tenant-id",
+          description: "Identificador do condominio ativo para a requisicao."
+        }
+      }
+    },
+    security: [{ sessionCookie: [], tenantHeader: [] }],
     paths: {
-      "/api/auth/login": { post: { summary: "Autentica um usuario" } },
+      "/api/auth/login": {
+        post: {
+          summary: "Autentica um usuario",
+          security: [],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["email", "password", "tenantId"],
+                  properties: {
+                    email: { type: "string", format: "email" },
+                    password: { type: "string", format: "password" },
+                    tenantId: { type: "string" }
+                  }
+                },
+                example: {
+                  email: "usuario@empresa.com",
+                  password: "<senha-do-usuario>",
+                  tenantId: "tenant_exemplo"
+                }
+              }
+            }
+          }
+        }
+      },
       "/api/session": { get: { summary: "Retorna a sessao atual" } },
       "/api/dashboard/overview": { get: { summary: "Resumo operacional do condominio" } },
       "/api/users": { get: { summary: "Lista usuarios" }, post: { summary: "Cria usuario" } },
@@ -429,14 +472,24 @@ export function createApp(options = {}) {
         });
       }
 
-      if (pathname === "/api/docs/openapi") {
-        return json(res, 200, createOpenApiDescription());
+      const db = database.get();
+      const auth = resolveAuth(req, db, url);
+
+      if (pathname === "/api/docs/openapi" || pathname === "/docs/api") {
+        if (!auth) return unauthorized(res, "Autentique-se para acessar a documentacao.");
+
+        if (pathname === "/api/docs/openapi") {
+          return json(res, 200, createOpenApiDescription());
+        }
+
+        const docsPath = path.join(DOCS_DIR, "api.md");
+        return sendStaticFile(res, docsPath) || notFound(res);
       }
 
       if (pathname === "/api/auth/login" && req.method === "POST") {
         const body = await parseJsonBody(req);
         if (!body) return badRequest(res, "JSON invalido.");
-        const user = database.get().users.find((item) => item.email.toLowerCase() === String(body.email ?? "").toLowerCase());
+        const user = db.users.find((item) => item.email.toLowerCase() === String(body.email ?? "").toLowerCase());
         if (!user || !verifyPassword(String(body.password ?? ""), user.passwordHash)) {
           return unauthorized(res, "Email ou senha invalidos.");
         }
@@ -481,11 +534,6 @@ export function createApp(options = {}) {
         });
       }
 
-      const docsPath = pathname === "/docs/api" ? path.join(DOCS_DIR, "api.md") : null;
-      if (docsPath) {
-        return sendStaticFile(res, docsPath) || notFound(res);
-      }
-
       if (!pathname.startsWith("/api")) {
         const staticPath =
           pathname === "/"
@@ -499,9 +547,6 @@ export function createApp(options = {}) {
         if (sendStaticFile(res, staticPath)) return;
         return notFound(res);
       }
-
-      const db = database.get();
-      const auth = resolveAuth(req, db, url);
 
       if (pathname === "/api/session" && req.method === "GET") {
         if (!auth) return unauthorized(res);
