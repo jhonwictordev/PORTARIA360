@@ -1,45 +1,43 @@
-App Portaria360
+# Portaria360
 
-Complete SaaS MVP for access control in residential and commercial condominiums, with API-first architecture, real-time operation, multi-condominium support, audit trail, SaaS billing, and a mobile/PWA app for residents.
+Access control SaaS MVP for residential and commercial condominiums, with web operations, resident PWA access, audit logs, and multi-tenant support.
 
-What’s Ready
-User management with profiles administrator, syndic, doorman, and resident
-Visitor and service provider registration via contact management
-Association of residents with units
-Scheduling, recurring authorization, and visit history per unit
-Real-time entry and exit logging
-Remote gate release via web or resident app
-Operational dashboard with alerts, devices, CCTV, and recent activity
-Webhooks, plan-based billing, CSV/PDF export, and notification logs
-Mobile PWA with offline queue and later synchronization
-Sensitive data encryption, password hashing, signed sessions, and optional TOTP 2FA
-Architecture
-Backend: Pure Node.js with REST API, SSE for real-time updates, and JSON persistence
-Web frontend: HTML/CSS/JS without build, with a responsive admin and concierge panel
-Mobile frontend: PWA in HTML/CSS/JS for residents
-Persistence: data/database.json
-Multi-tenant domain: a user can access multiple condominiums with the same account
-Structure
-src/server.mjs: HTTP bootstrap
-src/app.mjs: API, business rules, and static file delivery
-src/seed.mjs: multi-condominium demo database
-src/services/: persistence, real-time, and reporting
-src/utils/: security and HTTP utilities
-public/: web panel, mobile/PWA app, CSS, and assets
-tests/api.test.mjs: automated API tests
-docs/api.md: quick guide for endpoints
-Demo Credentials
-Administrator: admin@portaria360.local / Admin@123
-Syndic: sindico@solaris.local / Sindico@123
-Doorman: porteiro@solaris.local / Porteiro@123
-Resident: mariana@solaris.local / Morador@123
-How to Run
+## Overview
 
-If node is in the PATH:
+- API-first architecture for concierge and condominium operations
+- Visitor, resident, unit, and service provider management
+- Entry and exit logging with real-time activity updates
+- Remote gate release and operational dashboard
+- Audit trail, CSV and PDF export, webhooks, and billing foundations
+- Resident mobile PWA with offline queue and later synchronization
 
-node --run start
+## Stack
 
-If not, use this workspace launcher:
+- Node.js
+- REST API
+- Server-Sent Events
+- HTML, CSS, and JavaScript frontends
+- JSON persistence for MVP data storage
 
-.\run.ps1 start
+## Structure
 
+- `src/server.mjs`
+- `src/app.mjs`
+- `src/seed.mjs`
+- `src/services/`
+- `src/utils/`
+- `public/`
+- `tests/api.test.mjs`
+- `docs/api.md`
+
+## Local Run
+
+```bash
+npm install
+npm start
+npm test
+```
+
+## Notes
+
+The seed script creates demo roles for local evaluation. Replace demo data and the storage strategy before production use.
