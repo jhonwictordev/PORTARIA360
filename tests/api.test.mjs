@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { once } from "node:events";
 import { createApp } from "../src/app.mjs";
+import { createDatabase } from "../src/services/database.mjs";
 
 let server;
 let baseUrl;
+let database;
 
 test.before(async () => {
-  server = http.createServer(createApp({ persist: false }));
+  database = createDatabase({ persist: false });
+  server = http.createServer(createApp({ database }));
   server.listen(0);
   await once(server, "listening");
   const { port } = server.address();
@@ -129,16 +132,95 @@ test("liberacao remota e exportacao CSV funcionam", async () => {
   });
 
   const gateResponse = await authedFetch("/api/gates/gate_sol_main/open", cookie, "tenant_solaris", {
-    method: "POST"
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": "test-open-main-001" },
+    body: JSON.stringify({ expiresInSeconds: 10 })
   });
-  assert.equal(gateResponse.status, 200);
+  assert.equal(gateResponse.status, 202);
   const gatePayload = await gateResponse.json();
-  assert.match(gatePayload.message, /Comando enviado/);
+  assert.equal(gatePayload.command.status, "simulated");
+  assert.equal(gatePayload.command.integrationMode, "simulation");
+  assert.match(gatePayload.warning, /Nenhum equipamento fisico/);
 
   const exportResponse = await authedFetch("/api/exports/access-events.csv", cookie, "tenant_solaris");
   assert.equal(exportResponse.status, 200);
   const csv = await exportResponse.text();
   assert.match(csv, /Data,Pessoa,Tipo,Direcao,Metodo,Status/);
+});
+
+test("isola recursos por condominio e aplica permissoes por funcao", async () => {
+  const { cookie: residentCookie } = await login({
+    email: "mariana@solaris.local",
+    password: "Morador@123",
+    tenantId: "tenant_solaris"
+  });
+
+  const foreignTenant = await authedFetch("/api/dashboard/overview", residentCookie, "tenant_atrium");
+  assert.equal(foreignTenant.status, 401);
+
+  const foreignGate = await authedFetch("/api/gates/gate_atrium_lobby/open", residentCookie, "tenant_solaris", {
+    method: "POST",
+    headers: { "Idempotency-Key": "foreign-gate-001" }
+  });
+  assert.equal(foreignGate.status, 404);
+
+  const residentReport = await authedFetch("/api/reports/flow", residentCookie, "tenant_solaris");
+  assert.equal(residentReport.status, 403);
+
+  const { cookie: syndicCookie } = await login({
+    email: "sindico@solaris.local",
+    password: "Sindico@123",
+    tenantId: "tenant_solaris"
+  });
+  const syndicReport = await authedFetch("/api/reports/flow", syndicCookie, "tenant_solaris");
+  assert.equal(syndicReport.status, 200);
+});
+
+test("comando de portao expira, e idempotente, auditavel e bloqueia repeticao", async () => {
+  const { cookie } = await login({
+    email: "porteiro@solaris.local",
+    password: "Porteiro@123",
+    tenantId: "tenant_solaris"
+  });
+  const headers = { "Content-Type": "application/json", "Idempotency-Key": "gate-safety-001" };
+  const first = await authedFetch("/api/gates/gate_sol_garage/open", cookie, "tenant_solaris", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ expiresInSeconds: 3 })
+  });
+  assert.equal(first.status, 202);
+  const firstPayload = await first.json();
+  assert.ok(new Date(firstPayload.command.expiresAt) > new Date(firstPayload.command.createdAt));
+
+  const replay = await authedFetch("/api/gates/gate_sol_garage/open", cookie, "tenant_solaris", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ expiresInSeconds: 3 })
+  });
+  assert.equal(replay.status, 200);
+  const replayPayload = await replay.json();
+  assert.equal(replayPayload.replayed, true);
+  assert.equal(replayPayload.command.id, firstPayload.command.id);
+
+  const duplicate = await authedFetch("/api/gates/gate_sol_garage/open", cookie, "tenant_solaris", {
+    method: "POST",
+    headers: { ...headers, "Idempotency-Key": "gate-safety-002" },
+    body: JSON.stringify({ expiresInSeconds: 3 })
+  });
+  assert.equal(duplicate.status, 409);
+
+  const expired = await authedFetch("/api/gates/gate_sol_main/open", cookie, "tenant_solaris", {
+    method: "POST",
+    headers: { ...headers, "Idempotency-Key": "gate-expired-001" },
+    body: JSON.stringify({ issuedAt: new Date(Date.now() - 60_000).toISOString(), expiresInSeconds: 3 })
+  });
+  assert.equal(expired.status, 400);
+
+  const snapshot = database.snapshot();
+  const audits = snapshot.auditLogs.filter((entry) => entry.targetId === firstPayload.command.id);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].tenantId, "tenant_solaris");
+  assert.equal(audits[0].action, "gate.open_command.created");
 });
 
 test("documentacao exige autenticacao", async () => {

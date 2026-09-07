@@ -20,6 +20,7 @@ import {
 import {
   badRequest,
   binary,
+  conflict,
   forbidden,
   json,
   matchesRoute,
@@ -456,11 +457,16 @@ function canResidentChangeUnit(auth, unitId) {
 }
 
 export function createApp(options = {}) {
-  const database = createDatabase({ dataFile: options.dataFile, persist: options.persist ?? true });
+  const database = options.database ?? createDatabase({
+    dataFile: options.dataFile,
+    connectionString: options.connectionString,
+    persist: options.persist ?? true
+  });
   const hub = createRealtimeHub();
 
   return async function handler(req, res) {
     try {
+      await database.ready();
       const url = new URL(req.url, "http://localhost");
       const pathname = url.pathname;
 
@@ -468,6 +474,7 @@ export function createApp(options = {}) {
         return json(res, 200, {
           status: "ok",
           realtimeClients: hub.count(),
+          persistence: database.kind,
           databaseFile: database.file
         });
       }
@@ -504,7 +511,7 @@ export function createApp(options = {}) {
         const membership = getMembership(user, tenantId);
         if (!membership) return forbidden(res, "Usuario sem acesso ao condominio informado.");
 
-        database.mutate((db) => {
+        await database.mutate((db) => {
           const target = findUser(db, user.id);
           target.lastLoginAt = new Date().toISOString();
         });
@@ -588,7 +595,7 @@ export function createApp(options = {}) {
         if (!assertPermission(res, auth, "settings:write")) return;
         const body = await parseJsonBody(req);
         if (!body?.name || !body?.kind) return badRequest(res, "Informe nome e tipo do condominio.");
-        const condo = database.mutate((mutableDb) => {
+        const condo = await database.mutate((mutableDb) => {
           const created = {
             id: randomId("tenant"),
             name: body.name,
@@ -638,7 +645,7 @@ export function createApp(options = {}) {
         const allowedRoles = ["administrator", "syndic", "doorman", "resident"];
         if (!allowedRoles.includes(body.role)) return badRequest(res, "Role invalida.");
 
-        const created = database.mutate((mutableDb) => {
+        const created = await database.mutate((mutableDb) => {
           if (mutableDb.users.some((user) => user.email.toLowerCase() === body.email.toLowerCase())) {
             throw new Error("Ja existe um usuario com este email.");
           }
@@ -689,7 +696,7 @@ export function createApp(options = {}) {
         const [userId] = matchesRoute(pathname, /^\/api\/users\/([^/]+)$/);
         const body = await parseJsonBody(req);
         if (!body) return badRequest(res, "JSON invalido.");
-        const updated = database.mutate((mutableDb) => {
+        const updated = await database.mutate((mutableDb) => {
           const user = findUser(mutableDb, userId);
           if (!user || !getMembership(user, auth.tenantId)) throw new Error("Usuario nao encontrado.");
           if (body.name) user.name = body.name;
@@ -717,7 +724,7 @@ export function createApp(options = {}) {
         if (!assertPermission(res, auth, "units:write")) return;
         const body = await parseJsonBody(req);
         if (!body?.label) return badRequest(res, "Informe ao menos o identificador da unidade.");
-        const unit = database.mutate((mutableDb) => {
+        const unit = await database.mutate((mutableDb) => {
           const created = {
             id: randomId("unit"),
             tenantId: auth.tenantId,
@@ -749,7 +756,7 @@ export function createApp(options = {}) {
         if (!assertPermission(res, auth, "contacts:write")) return;
         const body = await parseJsonBody(req);
         if (!body?.name || !body?.type) return badRequest(res, "Campos obrigatorios: name e type.");
-        const created = database.mutate((mutableDb) => {
+        const created = await database.mutate((mutableDb) => {
           const contact = {
             id: randomId("contact"),
             tenantId: auth.tenantId,
@@ -793,7 +800,7 @@ export function createApp(options = {}) {
         if (auth.membership.role === "resident" && !canResidentChangeUnit(auth, body.unitId)) {
           return forbidden(res, "Somente moradores da unidade ou administradores podem criar autorizacoes.");
         }
-        const created = database.mutate((mutableDb) => {
+        const created = await database.mutate((mutableDb) => {
           const item = {
             id: randomId("allow"),
             tenantId: auth.tenantId,
@@ -836,7 +843,7 @@ export function createApp(options = {}) {
         if (auth.membership.role === "resident" && !canResidentChangeUnit(auth, body.unitId)) {
           return forbidden(res, "Sem permissao para agendar nesta unidade.");
         }
-        const created = database.mutate((mutableDb) => {
+        const created = await database.mutate((mutableDb) => {
           const resident = body.residentUserId ? findUser(mutableDb, body.residentUserId) : findResidentForUnit(mutableDb, auth.tenantId, body.unitId);
           const visit = {
             id: randomId("visit"),
@@ -885,7 +892,7 @@ export function createApp(options = {}) {
         if (!assertPermission(res, auth, "visits:write")) return;
         const [visitId] = matchesRoute(pathname, /^\/api\/visits\/([^/]+)\/authorize$/);
         const body = await parseJsonBody(req);
-        const updated = database.mutate((mutableDb) => {
+        const updated = await database.mutate((mutableDb) => {
           const visit = mutableDb.visits.find((item) => item.id === visitId && item.tenantId === auth.tenantId);
           if (!visit) throw new Error("Visita nao encontrada.");
           if (!canResidentChangeUnit(auth, visit.unitId) && !hasPermission(auth, "visits:write")) {
@@ -920,7 +927,7 @@ export function createApp(options = {}) {
         const gate = tenant?.gates.find((item) => item.id === body.gateId);
         if (!gate) return badRequest(res, "Gate invalido para o condominio atual.");
 
-        const preparedEvent = database.mutate((mutableDb) => {
+        const preparedEvent = await database.mutate((mutableDb) => {
           let status = body.status ?? "allowed";
           let displayName = body.displayName ?? "Acesso manual";
           let unitId = body.unitId ?? null;
@@ -982,36 +989,79 @@ export function createApp(options = {}) {
         if (!assertPermission(res, auth, "access:remote")) return;
         const [gateId] = matchesRoute(pathname, /^\/api\/gates\/([^/]+)\/open$/);
         const gate = findTenant(db, auth.tenantId)?.gates.find((item) => item.id === gateId);
-        if (!gate) return badRequest(res, "Gate nao encontrado.");
+        if (!gate) return notFound(res, "Gate nao encontrado no condominio ativo.");
 
-        const event = database.mutate((mutableDb) => {
-          const record = {
-            id: randomId("event"),
+        const idempotencyKey = String(req.headers["idempotency-key"] ?? "").trim();
+        if (idempotencyKey.length < 8 || idempotencyKey.length > 128) {
+          return badRequest(res, "Envie um Idempotency-Key entre 8 e 128 caracteres.");
+        }
+        const body = await parseJsonBody(req);
+        if (body === null) return badRequest(res, "JSON invalido.");
+        const ttlSeconds = Number(body.expiresInSeconds ?? 10);
+        if (!Number.isInteger(ttlSeconds) || ttlSeconds < 3 || ttlSeconds > 30) {
+          return badRequest(res, "expiresInSeconds deve ser um inteiro entre 3 e 30.");
+        }
+        const issuedAt = body.issuedAt ? new Date(body.issuedAt) : new Date();
+        if (Number.isNaN(issuedAt.getTime()) || Math.abs(Date.now() - issuedAt.getTime()) > 30_000) {
+          return badRequest(res, "Comando expirado ou com horario de emissao invalido.");
+        }
+
+        const result = await database.mutate((mutableDb) => {
+          mutableDb.gateCommands ??= [];
+          const existing = mutableDb.gateCommands.find(
+            (item) => item.tenantId === auth.tenantId && item.gateId === gateId && item.idempotencyKey === idempotencyKey
+          );
+          if (existing) return { command: existing, replayed: true };
+
+          const cooldownCutoff = Date.now() - 5_000;
+          const duplicate = mutableDb.gateCommands.find(
+            (item) =>
+              item.tenantId === auth.tenantId &&
+              item.gateId === gateId &&
+              item.actorId === auth.user.id &&
+              new Date(item.createdAt).getTime() >= cooldownCutoff
+          );
+          if (duplicate) return { blocked: true };
+
+          const createdAt = new Date().toISOString();
+          const command = {
+            id: randomId("gatecmd"),
             tenantId: auth.tenantId,
             gateId,
-            unitId: auth.membership.unitIds[0] ?? null,
-            userType: auth.membership.role,
-            subjectId: auth.user.id,
-            displayName: auth.user.name,
-            direction: "entry",
-            method: auth.membership.role === "resident" ? "REMOTE_APP" : "REMOTE_DESK",
-            status: "allowed",
-            createdAt: new Date().toISOString(),
-            metadata: { action: "remote-open" }
+            actorId: auth.user.id,
+            actorRole: auth.membership.role,
+            idempotencyKey,
+            status: "simulated",
+            integrationMode: "simulation",
+            createdAt,
+            expiresAt: new Date(Date.now() + ttlSeconds * 1_000).toISOString()
           };
-          mutableDb.accessEvents.unshift(record);
+          mutableDb.gateCommands.unshift(command);
+          mutableDb.gateCommands = mutableDb.gateCommands.slice(0, 1000);
           createAuditLog(mutableDb, {
             tenantId: auth.tenantId,
             actorId: auth.user.id,
-            action: "gate.remote_open",
-            targetType: "gate",
-            targetId: gateId,
-            details: { gateName: gate.name }
+            action: "gate.open_command.created",
+            targetType: "gate-command",
+            targetId: command.id,
+            details: {
+              gateId,
+              gateName: gate.name,
+              actorRole: auth.membership.role,
+              expiresAt: command.expiresAt,
+              integrationMode: command.integrationMode
+            }
           });
-          return sanitizeAccessEvent(mutableDb, record);
+          return { command, replayed: false };
         });
-        pushRealtime(hub, auth.tenantId, "gate.remote_open", event);
-        return json(res, 200, { message: `Comando enviado para ${gate.name}.`, event });
+        if (result.blocked) return conflict(res, "Comando repetido bloqueado pelo intervalo de seguranca de 5 segundos.");
+        if (!result.replayed) pushRealtime(hub, auth.tenantId, "gate.open_command.created", result.command);
+        return json(res, result.replayed ? 200 : 202, {
+          message: result.replayed ? "Resultado idempotente recuperado." : `Comando simulado registrado para ${gate.name}.`,
+          command: result.command,
+          replayed: result.replayed,
+          warning: "Nenhum equipamento fisico foi acionado: o provedor atual e uma simulacao."
+        });
       }
 
       if (pathname === "/api/alerts" && req.method === "GET") {
@@ -1028,7 +1078,7 @@ export function createApp(options = {}) {
         if (!assertPermission(res, auth, "integrations:write")) return;
         const body = await parseJsonBody(req);
         if (!body?.name || !body?.type) return badRequest(res, "Campos obrigatorios: name e type.");
-        const device = database.mutate((mutableDb) => {
+        const device = await database.mutate((mutableDb) => {
           const created = {
             id: randomId("device"),
             tenantId: auth.tenantId,
@@ -1057,7 +1107,7 @@ export function createApp(options = {}) {
         if (!body?.url || !Array.isArray(body.eventTypes)) {
           return badRequest(res, "Campos obrigatorios: url e eventTypes.");
         }
-        const webhook = database.mutate((mutableDb) => {
+        const webhook = await database.mutate((mutableDb) => {
           const created = {
             id: randomId("wh"),
             tenantId: auth.tenantId,
@@ -1101,7 +1151,7 @@ export function createApp(options = {}) {
         if (!body?.planId) return badRequest(res, "Informe o planId.");
         const plan = db.plans.find((item) => item.id === body.planId);
         if (!plan) return badRequest(res, "Plano nao encontrado.");
-        const subscription = database.mutate((mutableDb) => {
+        const subscription = await database.mutate((mutableDb) => {
           const existing = mutableDb.subscriptions.find((item) => item.tenantId === auth.tenantId);
           if (existing) {
             existing.planId = plan.id;

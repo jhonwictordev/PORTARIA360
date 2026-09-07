@@ -24,7 +24,7 @@
 - `POST /api/visits/:id/authorize`
 - `GET /api/access-events`
 - `POST /api/access-events`
-- `POST /api/gates/:id/open`
+- `POST /api/gates/:id/open` — comando simulado, expiravel e idempotente
 - `GET /api/alerts`
 - `GET /api/integrations/devices`
 - `POST /api/integrations/devices`
@@ -46,6 +46,25 @@
 
 - `Content-Type: application/json`
 - `x-tenant-id: tenant_solaris`
+- `Idempotency-Key: gate-command-unique-001` (obrigatorio na abertura remota)
+
+## Abertura remota de portao
+
+~~~http
+POST /api/gates/gate_sol_main/open
+Content-Type: application/json
+Idempotency-Key: gate-command-unique-001
+
+{
+  "issuedAt": "2026-09-06T12:00:00.000Z",
+  "expiresInSeconds": 10
+}
+~~~
+
+O comando novo retorna `202`; uma repeticao com a mesma chave retorna `200` e
+`replayed: true`. O timestamp de emissao deve estar dentro de 30 segundos do
+relogio do servidor. Esta rota registra uma **simulacao** auditavel: nenhum
+equipamento fisico e acionado pela implementacao atual.
 - `Cookie: session=...`
 
 ## Acesso a documentacao

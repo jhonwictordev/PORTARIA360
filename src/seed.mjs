@@ -471,6 +471,7 @@ export function createDemoDatabase() {
     deviceIntegrations,
     plans,
     subscriptions,
-    auditLogs: []
+    auditLogs: [],
+    gateCommands: []
   };
 }

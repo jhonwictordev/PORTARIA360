@@ -54,6 +54,10 @@ export function badRequest(res, message = "Requisicao invalida.") {
   json(res, 400, { error: message });
 }
 
+export function conflict(res, message = "Conflito com o estado atual do recurso.") {
+  json(res, 409, { error: message });
+}
+
 export function forbidden(res, message = "Acesso negado.") {
   json(res, 403, { error: message });
 }

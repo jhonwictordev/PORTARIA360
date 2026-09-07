@@ -5,3 +5,4 @@ data/database.json
 share-static/
 share-static.zip
 *.log
+node_modules/
