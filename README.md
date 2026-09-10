@@ -1,5 +1,7 @@
 # Portaria360
 
+> See the [portfolio overview](docs/portfolio-overview.md) for architecture, a safe public walkthrough and production boundaries.
+
 API-first access-control platform for residential and commercial condominiums. The project demonstrates multi-tenant authorization, visitor workflows, auditable gate commands, reporting and a resident PWA.
 
 ## Production-oriented persistence
