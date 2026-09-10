@@ -1,5 +1,7 @@
 # Portaria360
 
+[![CI](https://github.com/jhonwictordev/PORTARIA360/actions/workflows/ci.yml/badge.svg)](https://github.com/jhonwictordev/PORTARIA360/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e.svg)](LICENSE) [![Demo](https://img.shields.io/badge/demo-synthetic%20data-0ea5e9.svg)](https://jhonwictordev.github.io/PORTARIA360/) [![Integration](https://img.shields.io/badge/gate%20command-simulated-f59e0b.svg)](#production-oriented-persistence)
+
 > See the [portfolio overview](docs/portfolio-overview.md) for architecture, a safe public walkthrough and production boundaries.
 
 API-first access-control platform for residential and commercial condominiums. The project demonstrates multi-tenant authorization, visitor workflows, auditable gate commands, reporting and a resident PWA.
